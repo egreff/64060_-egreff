@@ -1,1 +1,161 @@
+---
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+title: "Assignment_2"
+output: html_document
+date: "2022-09-29"
+
+#Install packages
+```{r}
+library(caret) 
+library(psych) 
+library(FNN) 
+library(class) 
+library(e1071) 
+```
+
+#Read data
+```{r}
+bank.data<-read.csv("UniversalBank.csv")
+```
+
+#Drop ID and Zip Code columns from loaded data
+```{r}
+bank.data<-bank.data[,-c(1,5)]
+
+t(t(names(bank.data))) 
+```
+
+#Create dummy variables for Education variable
+```{r}
+bank.data.dummy.edu<-as.data.frame(dummy.code(bank.data$Education)) #separates the 3 levels of education into 3 separate columns, each coded as 0 or 1. 
+
+names(bank.data.dummy.edu)<-c("Education_1", "Education_2", "Education_3") #names the columns as specified in the code.
+
+bank.data_without_education<-subset(bank.data,select=-c(Education)) #eliminates the original education column from the data
+
+Universalbank.data<-cbind(bank.data_without_education, bank.data.dummy.edu) #combines the 3 new education columns with the whole dataset
+```
+
+
+#Data Partitioning: 60% training, 40% validation
+```{r}
+Train_Index=createDataPartition(Universalbank.data$Age, p=0.6, list=FALSE) #60% data reserved for training
+Train_Data=Universalbank.data[Train_Index,]
+
+Validation_Data = Universalbank.data[-Train_Index,] #Remaining 40% reserved for validation
+```
+
+#Create new customer Data
+```{r}
+New_cust<-data.frame(Age=40, Experience=10, Income=84, Family=2, CCAvg=2, Education_1=0, Education_2=1, Education_3=0, Mortgage=0, Securities.Account=0, CD.Account=0, Online=1, CreditCard=1, stringsAsFactors = FALSE) 
+```
+
+#Normalize the data
+```{r}
+Train_Norm_df<-Train_Data[,-7]
+Valid_Norm_df<-Validation_Data[,-7]
+New_Cust_Norm_df<-New_cust
+
+
+Norm_Data<-preProcess(Train_Data[,-7],method=c("center","scale"))
+
+Train_Norm_df<-predict(Norm_Data, Train_Data[,-7])
+Valid_Norm_df<-predict(Norm_Data, Validation_Data[,-7])
+New_Cust_Norm_df<-predict(Norm_Data, New_Cust_Norm_df)
+
+```
+
+#Question 1. After running the following code, the output of 0 indicates that the customer falls within the "loan not accepted" class.
+```{r}
+knn_pred_Q1<-class::knn(train=Train_Norm_df,test=New_Cust_Norm_df,cl=Train_Data$Personal.Loan,k=1)
+
+knn_pred_Q1
+```
+##[1] 0
+##Levels: 0 1
+
+
+#Question 2. After running the following code, the best performing k is k=3. k=3 has the highest accuracy and, therefore, is the best to use for predicting loan acceptance of a new customer.
+```{r}
+accuracy.df <- data.frame(k = seq(1, 15, 1), overallaccurace = rep(0, 15))
+
+for(i in 1:15){
+  knn.pred <- class::knn(train=Train_Norm_df, test=Valid_Norm_df, cl=Train_Data$Personal.Loan, k=i)
+  accuracy.df[i,2] <- confusionMatrix(knn.pred, as.factor(Validation_Data$Personal.Loan))$overall[1]
+ }
+```
+
+#Question 3. The following code displays the confustion matrix for the validation data that results from using the best performing k, which is k=3.
+```{r}
+knn_pred_Q3<-class::knn(train=Train_Norm_df,test=Valid_Norm_df,cl=Train_Data$Personal.Loan,k=3)
+
+knn_pred_Q3
+actual=Validation_Data$Personal.Loan
+table(knn_pred_Q3,actual)
+```
+  
+#Question 4. After running the following code, the best performing k (k=3) outputs a 0. This means that the customer would still be classified as "loan not accepted."
+```{r}
+knn_pred_Q4<-class::knn(train=Train_Norm_df,test=New_Cust_Norm_df,cl=Train_Data$Personal.Loan,k=3)
+
+knn_pred_Q4
+```
+
+
+# Question 5: Part 1
+#Repartition the data into training=50%, valid=30%, test=20%
+```{r}
+Test_Index_Rep=createDataPartition(Universalbank.data$Age, p=0.2, list=FALSE) #20% to Test
+Test_Data_Rep=Universalbank.data[Test_Index_Rep,]
+TraVal_Data_Rep=Universalbank.data[-Test_Index_Rep,] #Remaining 80% to Training and Validation
+
+Train_Index_Rep=createDataPartition(TraVal_Data_Rep$Age,p=0.625, list=FALSE) #Of the remaining 80% data, 62.5% goes to train, which would be 50% of the total 100%
+Train_Data_Rep=TraVal_Data_Rep[Train_Index_Rep,]
+Validation_Data_Rep=TraVal_Data_Rep[-Train_Index_Rep,] #Remaining to validation
+
+```
+
+#Question 5: Part 2
+```{r}
+#normalize the data
+Train_Norm_df_rep<-Train_Data_Rep[,-7]
+Valid_Norm_df_rep<-Validation_Data_Rep[,-7]
+Test_Norm_df_rep<-Test_Data_Rep[,-7]
+
+Norm_Data_Rep<-preProcess(Train_Data_Rep[,-7],method=c("center","scale"))
+
+Train_Norm_df_rep<-predict(Norm_Data_Rep, Train_Data_Rep[,-7])
+Valid_Norm_df_rep<-predict(Norm_Data_Rep, Validation_Data_Rep[,-7])
+Test_Norm_df_rep<-predict(Norm_Data_Rep, Test_Data_Rep[,-7])
+
+
+#knn prediction model with k=3 for test set
+knn_pred_Q5_test<-class::knn(train=Train_Norm_df_rep,test=Test_Norm_df_rep,cl=Train_Data_Rep$Personal.Loan,k=3)
+
+knn_pred_Q5_test
+
+
+#confusion matrix for test set
+actual_test=Test_Data_Rep$Personal.Loan
+table(knn_pred_Q5_test,actual_test)
+
+
+#knn prediction model for training set
+knn_pred_Q5_valid<-class::knn(train=Train_Norm_df_rep,test=Valid_Norm_df_rep,cl=Train_Data_Rep$Personal.Loan,k=3)
+
+knn_pred_Q5_valid
+
+
+#confusion matrix for training set
+actual_valid=Validation_Data_Rep$Personal.Loan
+table(knn_pred_Q5_valid,actual_valid)
+
+
+```
+#Comment on differences: 
+  #After reviewing the 2 confusion matrices, the test set had less false negatives and false positives than the training set. A false negative is when the model predicted loan not accepted when in fact it   was accepted. A false positive is when the model predicted loan accepted when in fact it was not accepted. When the test set was used in the model, its accuracy was higher then when the training set was used. Because 50% of the data was used to train the model and 80% was used to test the model, more accuracy could be obtained from the use of more data in testing.
 
