@@ -1,0 +1,94 @@
+---
+title: "Assignment_3"
+output:
+  word_document: default
+  html_document: default
+date: "2022-10-06"
+---
+#Install packages
+```{r}
+library(e1071) #package for Naive Bayes classifier
+library(reshape) #package for the melt function
+library(reshape2)#package for the dcast function
+```
+
+#Read data
+```{r}
+bank.data<-read.csv("Universalbank.csv")
+```
+
+#Data partitioning: 60% training, 40% validation
+```{r}
+set.seed(1)
+train.index<-sample(row.names(bank.data), 0.6*dim(bank.data)[1])
+valid.index <- setdiff(row.names(bank.data), train.index) 
+train.df<-bank.data[train.index,]
+valid.df<-bank.data[valid.index,]
+```
+
+#A. Create a pivot table for the training data with Online as a column variable, CC as a row variable, and Loan as a secondary row variable. The values inside the table should convey the count 
+```{r}
+#melt to stack columns
+mlt<-melt(train.df, id=c("CreditCard","Personal.Loan"),measure=c("Online"))
+
+#name data for dcast function
+CC<-train.df$CreditCard
+Personal.Loan<-train.df$Personal.Loan
+Online<-train.df$Online
+
+#dcast to create pivot table
+recast.bank=dcast(mlt,CC+Personal.Loan~Online)
+recast.bank[,c(1:4)]
+```
+
+#B. Consider the task of classifying a customer who owns a bank credit card and is actively using online banking services. Looking at the pivot table, what is the probability that this customer will accept the loan offer?
+```{r}
+47/(47+469)
+```
+
+#C. Create two separate pivot tables for the training data. One will have Loan (rows) as a function of Online (Columns) and the other will have Loan (rows) as a function of CC.
+```{r}
+mlt.table1<-melt(train.df, id=c("Personal.Loan"),measure=c("Online"))
+recast.bank.table1=dcast(mlt.table1,Personal.Loan~Online)
+recast.bank.table1[,c(1:3)]
+
+mlt.table2<-melt(train.df, id=c("Personal.Loan"),measure=c("CreditCard"))
+recast.bank.table2=dcast(mlt.table2,Personal.Loan~CC)
+recast.bank.table2[,c(1:3)]
+```
+
+#D. Compute the following quantities 
+```{r}
+#i 
+77/(77+198)
+#ii 
+166/(166+109)
+#iii 
+275/3000
+#iv
+801/(801+1924)
+#v
+1588/(1588+1137)
+#vi
+2725/3000
+```
+
+#E. Use the quantities computed above to compute the naive Bayes probability P(Loan=1 CC=1, Online=1)
+```{r}
+(0.28*0.6036364*0.09166667)/((0.28*0.6036364*0.09166667)+(0.293945*0.5827523*0.9083333))
+```
+#F. Compare this value with the one obtained from the pivot table in (B). Which is a more accurate estimate?
+The naive Bayes probability of 0.09055758 and the probability of 0.09108527 from the pivot table are relatively close in value. However, the naive Bayes probability is a more accurate estimate. This is because naive Bayes assumes conditional independence. In other words, it is not required that features of the record to be classified be exactly the same as the features in the training set in order to classify it. 
+
+#G. Which of the entries in this table are needed for computing P(Loan=1 CC=1, Online=1)? Run naive Bayes on the data. Examine the model output on training data, and find the entry that corresponds to P(Loan=1 CC=1, Online=1). Compare this to the number you obtained in (E).
+```{r}
+nb_model<-naiveBayes(Personal.Loan~CreditCard+Online,data=train.df)
+nb_model
+```
+#The naiveBayes model output of 0.09 is the same as the 0.09 output obtained in (E).
+
+
+
+
+
+
