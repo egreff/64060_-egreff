@@ -1,0 +1,66 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+#load packages
+```{r}
+library(stats)
+```
+
+#load dataset
+```{r}
+pharm.data<-read.csv("Pharmaceuticals.csv")
+```
+
+#Part a.
+```{r}
+pharm.df<-pharm.data[,c(3:11)] #use only numerical variables to cluster the 21 firms.
+
+pharm.df.norm <- scale(pharm.df) #normalize the data so that the data is on a common scale.
+
+distance <- dist(pharm.df.norm, method="euclidean")
+hc<-hclust(distance, method="average", members=NULL)
+#measure distance using euclidean distance metric. I decided to use hierarchical clustering because the dataset is small. Also, it is easy to understand.
+
+plot(hc, hang=-1, ann=FALSE) # plot a dendrogram. The number of clusters formed appears to be 3. I determined this because it appears that there are 3 separations in the dendrogram. 
+```
+#Part b.
+```{r}
+hc3 <- cutree(hc, k=3)
+hcagg3 = aggregate(hc3, pharm.df, FUN=mean)
+hcagg3
+
+#Cluster 1 appears to consist of many firms with large market capitalization and high net profit margins. Also, all the firms are less risky than the market, with Betas of less than 1.
+
+#Cluster 2 firms have lower net profit margins, but relatively high P/E ratios. 
+
+#Cluster 3 firms have small market capitalization, but mostly large revenue growth. They also have firms with higher market risk and leverage.
+```
+
+#Part c.
+```{r}
+Med.Rec.Table = table(pharm.data$Median_Recommendation, hc3)
+colnames(Med.Rec.Table)=c("cl1","cl2","cl3")
+Med.Rec.Table
+
+Location.Table = table(pharm.data$Location, hc3)
+colnames(Location.Table)=c("cl1","cl2","cl3")
+Location.Table
+
+Exchange.Table = table(pharm.data$Exchange, hc3)
+colnames(Exchange.Table)=c("cl1","cl2","cl3")
+Exchange.Table
+
+#Cluster 1 appears to be the largest cluster, which is made up of 15 firms. The majority of firms in Cluster 1 have a hold recommendation, are located in the US, and traded on NYSE.
+
+#Cluster 2 consists of 3 firms. The majority have a hold recommendation. All are located in different countries and traded on NYSE.
+
+#Cluster 3 consists of 3 firms. The majority have a moderate buy recommendation, location in the US, and traded on NYSE.
+```
+
+#Part d
+#Cluster 1 Name: Large Market Cap Cluster
+#Cluster 2 Name: High P/E Ratio Cluster
+#Cluster 3 Name: High Revenue Growth Cluster
+
