@@ -1,0 +1,163 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+
+#First, load packages
+```{r}
+library(utils)
+library(base)
+library(stats)
+library(graphics)
+library(cluster)
+library(factoextra)
+library(knitr)
+```
+
+#Second, prep the data
+```{r}
+#Load dataset
+Cereal.Data<-read.csv("Cereals.csv") 
+
+#Set row names to the Cereals column
+row.names(Cereal.Data) <- Cereal.Data[,1]
+
+#Remove Cereals column
+Cereal.Data <- Cereal.Data[,-1]
+```
+
+#Normalize dataset
+```{r}
+Cereal.DF<-Cereal.Data[,3:15] #only numeric variables
+Cereal.DF.Norm1<-sapply(Cereal.DF, scale) # normalization
+
+row.names(Cereal.DF.Norm1) <- row.names(Cereal.Data)#set row names to cereal names
+```
+
+#Remove all cereals with missing values
+```{r}
+Cereal.DF.Norm2<-na.omit(Cereal.DF.Norm1)
+head(Cereal.DF.Norm2)
+```
+#Dissimilarity matrix 
+```{r}
+d<-dist(Cereal.DF.Norm2, method = "euclidean")
+```
+
+#Hierarchical clustering using different methods
+```{r}
+hclust.1<-hclust(d, method = "single")
+plot(hclust.1, cex=0.3, hang=-1, sub="single method")
+
+hclust.2<-hclust(d, method="complete")
+plot(hclust.2, cex=0.3, hang=-1, sub="complete method")
+
+hclust.3<-hclust(d, method="average")
+plot(hclust.3, cex=0.3, hang=-1, sub="average method")
+
+hclust.4<-hclust(d, method="ward.D")
+plot(hclust.4, cex=0.3, hang=-1, sub="ward method")
+```
+
+#Computing AGNES with different methods of linkage
+```{r}
+hclust.single<-agnes(Cereal.DF.Norm2, method="single")
+hclust.complete<-agnes(Cereal.DF.Norm2, method="complete")
+hclust.average<-agnes(Cereal.DF.Norm2, method= "average")
+hclust.ward<-agnes(Cereal.DF.Norm2, method= "ward")
+```
+
+#Compare AGNES coefficients with different linkage methods
+```{r}
+print(hclust.single$ac)
+print(hclust.complete$ac)
+print(hclust.average$ac)
+print(hclust.ward$ac) #Best method of linkage
+```
+#The best method of linkage is the ward method. This is because the AGNES coefficient is the highest;therefore, the ward method provides the strongest clustering structure.
+
+#How many clusters would you choose? 4 clusters
+```{r}
+plot(hclust.4,cex=0.3, hang=-1)
+rect.hclust(hclust.4, k=4, border="purple")
+clust.1<-cutree(hclust.4, k=4)
+c.1<-as.data.frame(cbind(Cereal.DF.Norm2,clust.1))
+```
+
+#Comment on the structure of the clusters and on their stability.
+```{r}
+#normalized data with missing values omitted
+part.data<-Cereal.DF.Norm2
+
+#partition the cereal data
+part.A<-part.data[1:55,]
+part.B<-part.data[56:74,]
+
+#Computing AGNES with different methods of linkage
+hclust.5<- agnes(part.A,method = "ward")
+hclust.6<-agnes(part.A,method="average")
+hclust.7<-agnes(part.A,method="complete")
+hclust.8<-agnes(part.A,method="single")
+
+#create a table of AGNES coefficients
+kable(cbind(ward=hclust.5$ac,average=hclust.6$ac,complete=hclust.7$ac,single=hclust.8$ac))
+#Ward method is the best because it has the highest AGNES coefficient. 
+
+#plot dendrogram of AGNES using best method (ward method)
+pltree(hclust.5,cex=0.3,hang=-1,main="Dendrogram of AGNES")
+
+#create clusters in dendrogram of AGNES
+rect.hclust(hclust.5, k = 4, border = "purple")
+
+#identify cereals in the 4 clusters
+clust.2<-cutree(hclust.5, k=4)
+result<-as.data.frame(cbind(part.A,clust.2))
+
+#finding cluster centers of part.A data
+result[result$clust.2==1,]
+center.1<-colMeans(result[result$clust.2==1,])
+result[result$clust.2==2,]
+center.2<-colMeans(result[result$clust.2==2,])
+result[result$clust.2==3,]
+center.3<-colMeans(result[result$clust.2==3,])
+result[result$clust.2==4,]
+center.4<-colMeans(result[result$clust.2==4,])
+all.centers<-rbind(center.1,center.2,center.3,center.4)
+
+#Assigning part.B data to clusters using cluster centroids from part.A data
+c.2<-as.data.frame(rbind(all.centers[,-14],part.B))
+
+dis<-get_dist(c.2)
+matrix<-as.matrix(dis)
+
+data.1<-data.frame(data=seq(1,nrow(part.B),1),clusters=rep(0,nrow(part.B)))
+
+#Assessing how consistent the cluster assignments are compared to the assignments based on all data.
+for(i in 1:nrow(part.B))
+{
+  data.1[i,2]<-which.min(matrix[i+4,1:4])
+}
+data.1
+cbind(c.1$clust.1[56:74],data.1$clusters)
+table(c.1$clust.1[56:74]==data.1$clusters)
+```
+#The stability of the clusters is 94.74% rounded. Out of the 19 variables in part.B, 18 were consistent with assignments based on all data and 1 was not consistent. Therefore, the stability is 18/19 = 94.74% rounded.
+
+#Find a cluster of "healthy cereals" 
+```{r}
+#We do not want to normalize the data because we want the exact value of the ratings to determine the healthy cereals. We still want to omit missing values.
+cereals<-na.omit(Cereal.Data)
+
+#show data frame for each cluster to analyze ratings
+cluster.1<-as.data.frame(cbind(cereals,clust.1))
+cluster.1[cluster.1$clust.1==1,]
+cluster.1[cluster.1$clust.1==2,]
+cluster.1[cluster.1$clust.1==3,]
+cluster.1[cluster.1$clust.1==4,]
+
+```
+#Based on the ratings of the various cereals in each cluster, cluster 1 consists of the highest rated cereals; therefore, cluster 1 has the healthiest cereals followed by cluster 4. Cluster 3 has the unhealthiest cereals due to the lowest ratings of cereals in that cluster. 
+
+
+
