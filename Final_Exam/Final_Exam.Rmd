@@ -1,0 +1,65 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+#Load Packages
+```{r}
+library(tibble)
+library(utils)
+library(stats)
+library(dplyr)
+library(base)
+library(factoextra)
+```
+
+#Read the data
+```{r}
+data<-read.csv("OnlineRetail.csv",row.names = NULL)
+```
+
+#Prep the data for analysis
+```{r}
+#omit null values
+data<-na.omit(data)
+
+#calculate total spent by each customer
+data.totalspent<-data%>%
+  select(Quantity,UnitPrice,CustomerID)%>%
+  mutate(TotalSpent = Quantity*UnitPrice)%>%
+  group_by(CustomerID)%>%
+  summarise(SumSpent=sum(TotalSpent))
+
+#calculate frequency of purchases by each customer
+data.freq<-data%>%
+  select(InvoiceNo,CustomerID)%>%
+  group_by(CustomerID)%>%
+  count(InvoiceNo)%>%
+  summarise(freq=sum(n))
+
+summary<-merge(data.freq,data.totalspent)
+```
+
+#Normalize the data for analysis
+```{r}
+summary.norm<-summary[,2:3]
+summary.norm<-sapply(summary.norm,scale)#normalization
+```
+
+#Choose optimal number of clusters for analysis using Elbow method
+```{r}
+fviz_nbclust(summary.norm,kmeans,method="wss") #results show 4 clusters is optimal
+```
+
+#Perform kmeans clustering and analyze the results
+```{r}
+k4<-kmeans(summary.norm,centers=4,nstart=50)
+k4$centers #centroids of each cluster for each variable
+k4$size #size of each cluster
+fviz_cluster(k4,data=summary.norm) #cluster visualization
+
+#Cluster 1 - Low frequency customers and low amount spent
+#Cluster 2 - Very low frequency customers and very low amount               spent
+#Cluster 3 - Very high frequency customers and high amount spent
+#Cluster 4 - Low frequency customers and very high amount spent
+```
